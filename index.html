@@ -62,9 +62,10 @@
           let doAnim = true;
           let clicked = false;
           let adj = 0; 
-          const adjAmt = 0.01; //speed of animation
+          const adjAmt = 0.25; //speed of bubble 
+          const dAdjAmt = adjAmt * 100; // speed of droplets
           let radius = r;
-          let rM;
+          let rM; // slope between circle center and click point
           let m; // slope of circle opening (perpendicular to rM)
           let yAxis = false; // default droplets populate along x axis
           let ddx = 1, ddy = 1; // pos or neg droplet direction outward from bubble
@@ -83,24 +84,20 @@
               ctx.beginPath();
               ctx.arc(this.xPos, this.yPos, this.size, 0, PI * 2);
               ctx.fillStyle = `rbga(${this.color}, ${this.opacity})`;
-              ctx.strokeStyle = `rbga(${this.color}, ${this.opacity + 0.1})`;
+              ctx.strokeStyle = `rbga(${this.color}, ${this.opacity})`;
               ctx.fill();
               ctx.stroke();
             }
 
             this.update = function() {
-
-              // figure out a modulo or fraction for when to increment x or y based on slope.
-
               if (this.its > 0) {
+                const gravity = 1 / (this.vel * 2 * dAdjAmt);
                 if (yAxis) {
-                  let n = 1/(this.vel * 20);
-                  this.xPos += ddx * this.vel;
-                  this.yPos += n; // figure out
+                  this.xPos += (ddx * this.vel / dAdjAmt);
+                  this.yPos += gravity;
                 } else {
-                  let n = ddy + 1/(this.vel * 20);
-                  this.xPos += 0; // figure out
-                  this.yPos += n;
+                  this.xPos += 0; // could adjust for slope
+                  this.yPos += (gravity + (ddy * this.vel / dAdjAmt));
                 }
                 if (this.vel > 0.4){
                   this.vel -= 0.04;
@@ -154,7 +151,7 @@
           //   requestAnimationFrame(popFromCenter);
           // }
 
-          function popFromEdge(time){
+          function popFromEdge(){
             ctx.clearRect(0,0,w,h);
             if (!doAnim) {
               window.cancelAnimationFrame(popFromEdge);
@@ -192,19 +189,23 @@
               let sz = rndm(0.5, 1.8, 1);
               let opc = rndm(0.4, 0.7, 1);
               let its = rndm(0, Math.min((droplets.length/4), 40));
-              let vel = rndm(0.4, 1.5, 1);
+              let vel = rndm(0.4, 3, 1);
+              let xOffset = 0; // to avoid obvious rows when bubble opens fast
+              let yOffset = 0;
               if (x === null) {
                 x = Math.round(((y - statY)/m) + statX);
+                xOffset = rndm(-10,10);
               } else {
                 y = Math.round((m * (x-statX)) + statY);
+                yOffset = rndm(-10,10);
               }
-              let drop = new Droplet(rgb1, sz, x, y, opc, its, vel);
+              let drop = new Droplet(rgb1, sz, x + xOffset, y + yOffset, opc, its, vel);
               droplets.push(drop);
               drop.draw();
             }
 
             // determine placement of initial droplet rows depending on opening direction
-            let xyAdj = 20; // space between droplets
+            let xyAdj = 5; // space between droplets
             let x, y, statX, statY, xMax, yMax, origY, origX; 
             if (yAxis) {
               if (cirPt1Y > cirPt2Y) {
