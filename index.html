@@ -35,10 +35,11 @@
       const bubbles = document.getElementsByClassName('bubble');
       const PI = Math.PI;
 
+      // makes canvas responsive
       function redraw() {
         const h = window.innerHeight;
         const w = window.innerWidth;
-        const padding = (4 * w) / 100; // 4vw space for explosion droplets
+        const padding = (5 * w) / 100; // 4vw space for explosion droplets
         for (let i=0; i<bubbles.length; i++) {
           const c = bubbles[i];
           let droplets = [];
@@ -58,62 +59,17 @@
           ctx.closePath();
           ctx.fill();
 
-          let angle; //radians
+          let angle; // radians
           let doAnim = true;
           let clicked = false;
-          let adj = 0; 
-          const adjAmt = 0.3; //speed of bubble - best btw 0.03 and 0.5
+          let adj = 0; // used for bubble opening
+          const adjAmt = 0.3; // speed of bubble pop - best btw 0.03 and 0.5
           const dAdjAmt = adjAmt * 100; // speed of droplets
           let radius = r;
           let rM; // slope between circle center and click point
           let m; // slope of circle opening (perpendicular to rM)
           let yAxis = false; // default droplets populate along x axis
           let ddx = 1, ddy = 1; // pos or neg droplet direction outward from bubble
-
-          function Droplet(color, size, xPos, yPos, opacity, its, vel) {
-            this.color = color;
-            this.size = size;
-            this.xPos = xPos;
-            this.yPos = yPos;
-            this.opacity = opacity;
-            this.its = its;
-            this.vel = vel;
-
-            this.draw = function(){
-              ctx.beginPath();
-              ctx.arc(this.xPos, this.yPos, this.size, 0, PI * 2);
-              ctx.fillStyle = `rbga(${this.color}, ${this.opacity})`;
-              // ctx.strokeStyle = `rbga(${this.color}, ${this.opacity + 0.1})`;
-              ctx.fill();
-              ctx.stroke();
-            }
-            // edge pop
-            this.update = function() {
-              if (this.its > 0) {
-                const gravity = 1 / (this.vel * 2 * dAdjAmt);
-                let xSlope = 0;
-                let xM = Math.abs(1 / rM);
-                xM < 0.8 ? xSlope = xM*ddx : null; 
-                if (yAxis) {
-                  this.xPos += (xSlope / dAdjAmt) + (ddx * this.vel / dAdjAmt);
-                  this.yPos += gravity;
-                } else {
-                  this.xPos += (xSlope / dAdjAmt);
-                  this.yPos += (gravity + (ddy * this.vel / dAdjAmt));
-                }
-                if (this.vel > 0.4){
-                  this.vel -= 0.04;
-                } else {
-                  this.its = 0;
-                }
-                this.draw();
-              }
-            }
-            //center pop
-            this.cpUpdate = function() {
-
-            }
-          }
 
           c.addEventListener('click', function(e) {
             if (!clicked) {
@@ -137,11 +93,28 @@
               }
               m = (-1/rM).toFixed(3);
               rM = rM.toFixed(1);
-              // console.log("droplets x, y slope", dropletsXM, dropletsYM);
-              // console.log(rM, m)
               clicked = true;
             }
           }, false);
+
+          function createDroplet(color, x, y, statX, statY) {
+            let sz = rndm(0.5, 1.8, 1);
+            let opc = rndm(0.4, 0.7, 1);
+            let its = rndm(0, Math.min((droplets.length/4), 40));
+            let vel = rndm(0.4, 3, 1);
+            let xOffset = 0, yOffset = 0; // row randomizer
+            if (x === null) {
+              x = Math.round(((y - statY)/m) + statX);
+              xOffset = rndm(-10,10);
+            } else {
+              y = Math.round((m * (x-statX)) + statY);
+              yOffset = rndm(-10,10);
+            }
+            let drop = new Droplet(ctx, color, sz, x + xOffset, y + yOffset, opc, its, vel, ddx, ddy, dAdjAmt, yAxis, rM);
+            droplets.push(drop);
+            drop.draw();
+          }
+
 
           // function popFromCenter(time){
           //   ctx.clearRect(0,0,w,h);
@@ -184,41 +157,22 @@
 
           function drawEdgePop(){
             adj += adjAmt;
+            if (adj > PI - adjAmt) {
+              doAnim = false; // stop animation when edge reached
+            }
+
             const s = angle + adj;
             const e = angle - adj;
-
-            if (adj > PI - adjAmt) {
-              doAnim = false;
-            }
-            // move previous droplets
-            for (let i = 0; i < droplets.length; i++) {
-              droplets[i].update();
-            }
 
             // x and y of the two points on bubble circumference at bubble opening
             const cirPt1X = Math.round(centerX + (radius * Math.cos(s)));
             const cirPt1Y = Math.round(centerY - (radius * Math.sin(-s)));
             const cirPt2X = Math.round(centerX + (radius * Math.cos(e)));
             const cirPt2Y = Math.round(centerY - (radius * Math.sin(-e)));
-            // let i = 0;
 
-            function createDroplet(x, y, statX, statY) {
-              let sz = rndm(0.5, 1.8, 1);
-              let opc = rndm(0.4, 0.7, 1);
-              let its = rndm(0, Math.min((droplets.length/4), 40));
-              let vel = rndm(0.4, 3, 1);
-              let xOffset = 0; // to avoid obvious rows when bubble opens fast
-              let yOffset = 0;
-              if (x === null) {
-                x = Math.round(((y - statY)/m) + statX);
-                xOffset = rndm(-10,10);
-              } else {
-                y = Math.round((m * (x-statX)) + statY);
-                yOffset = rndm(-10,10);
-              }
-              let drop = new Droplet(rgb1, sz, x + xOffset, y + yOffset, opc, its, vel);
-              droplets.push(drop);
-              drop.draw();
+            // move previous droplets
+            for (let i = 0; i < droplets.length; i++) {
+              droplets[i].eupdate();
             }
 
             // determine placement of initial droplet rows depending on opening direction
@@ -232,7 +186,7 @@
               }
               origY = y;
               while (y < yMax) {
-                createDroplet(null, rndm(origY+1, yMax-1, 1), statX, statY);
+                createDroplet(rgb1, null, rndm(origY+1, yMax-1, 1), statX, statY);
                 y += xyAdj;
               }
             } else {
@@ -243,11 +197,10 @@
               }
               origX = x;
               while (x < xMax) {
-                createDroplet(rndm(origX+1,xMax-1,1), null, statX, statY);
+                createDroplet(rgb1, rndm(origX+1,xMax-1,1), null, statX, statY);
                 x += xyAdj;
               }
             }
-
             // draw bubble
             ctx.beginPath();
             ctx.arc(centerX,centerY,r,s,e);
@@ -255,11 +208,61 @@
             ctx.fill();
             ctx.stroke();
           }
-        }
-      }
-      //end for loop
+        } // end of for loop
+      } // end of redraw function
 
       redraw();
+
+      function Droplet(ctx, color, size, xPos, yPos, opacity, its, vel, ddx, ddy, dAdjAmt, yAxis, slope) {
+        this.ctx = ctx;
+        this.color = color;
+        this.size = size;
+        this.xPos = xPos;
+        this.yPos = yPos;
+        this.opacity = opacity;
+        this.its = its;
+        this.vel = vel;
+        this.ddx = ddx;
+        this.ddy = ddy;
+        this.dAdjAmt = dAdjAmt;
+        this.slope = slope;
+        this.yAxis = yAxis;
+
+        this.draw = function(){
+          ctx.beginPath();
+          ctx.arc(this.xPos, this.yPos, this.size, 0, PI * 2);
+          ctx.fillStyle = `rbga(${this.color}, ${this.opacity})`;
+          // ctx.strokeStyle = `rbga(${this.color}, ${this.opacity + 0.1})`;
+          ctx.fill();
+          ctx.stroke();
+        }
+        // edge pop
+        this.eupdate = function() {
+          if (this.its > 0) {
+            const gravity = 1 / (this.vel * 2 * this.dAdjAmt);
+            let xSlope = 0;
+            let xM = Math.abs(1 / this.slope);
+            xM < 0.8 ? xSlope = xM * this.ddx : null; 
+            if (yAxis) {
+              this.xPos += (xSlope / this.dAdjAmt) + (this.ddx * this.vel / this.dAdjAmt);
+              this.yPos += gravity;
+            } else {
+              this.xPos += (xSlope / this.dAdjAmt);
+              this.yPos += (gravity + (this.ddy * this.vel / this.dAdjAmt));
+            }
+            if (this.vel > 0.4){
+              this.vel -= 0.04;
+            } else {
+              this.its = 0;
+            }
+            this.draw();
+          }
+        }
+        //center pop
+        this.cupdate = function() {
+
+        }
+      }
 
       let timeout = false;
       window.addEventListener('resize', function() {
