@@ -62,14 +62,13 @@
           let doAnim = true;
           let clicked = false;
           let adj = 0; 
-          const adjAmt = 0.25; //speed of bubble 
+          const adjAmt = 0.3; //speed of bubble - best btw 0.03 and 0.5
           const dAdjAmt = adjAmt * 100; // speed of droplets
           let radius = r;
           let rM; // slope between circle center and click point
           let m; // slope of circle opening (perpendicular to rM)
           let yAxis = false; // default droplets populate along x axis
           let ddx = 1, ddy = 1; // pos or neg droplet direction outward from bubble
-          let ccdx, ccdy; // px between click and center
 
           function Droplet(color, size, xPos, yPos, opacity, its, vel) {
             this.color = color;
@@ -84,19 +83,22 @@
               ctx.beginPath();
               ctx.arc(this.xPos, this.yPos, this.size, 0, PI * 2);
               ctx.fillStyle = `rbga(${this.color}, ${this.opacity})`;
-              ctx.strokeStyle = `rbga(${this.color}, ${this.opacity})`;
+              // ctx.strokeStyle = `rbga(${this.color}, ${this.opacity + 0.1})`;
               ctx.fill();
               ctx.stroke();
             }
-
+            // edge pop
             this.update = function() {
               if (this.its > 0) {
                 const gravity = 1 / (this.vel * 2 * dAdjAmt);
+                let xSlope = 0;
+                let xM = Math.abs(1 / rM);
+                xM < 0.8 ? xSlope = xM*ddx : null; 
                 if (yAxis) {
-                  this.xPos += (ddx * this.vel / dAdjAmt);
+                  this.xPos += (xSlope / dAdjAmt) + (ddx * this.vel / dAdjAmt);
                   this.yPos += gravity;
                 } else {
-                  this.xPos += 0; // could adjust for slope
+                  this.xPos += (xSlope / dAdjAmt);
                   this.yPos += (gravity + (ddy * this.vel / dAdjAmt));
                 }
                 if (this.vel > 0.4){
@@ -106,6 +108,10 @@
                 }
                 this.draw();
               }
+            }
+            //center pop
+            this.cpUpdate = function() {
+
             }
           }
 
@@ -124,8 +130,6 @@
               }
               angle = (Math.atan2(clickY - r - (padding/4), clickX - r - (padding/2))); 
               rM = ((clickY - centerY) / (clickX - centerX));
-              ccdx = Math.abs(clickX - centerX);
-              ccdy = Math.abs(clickY - centerY);
               centerX > clickX ? ddx = -1 : null;
               clickY < centerY ? ddy = -1 : null;
               if (rM >= -1 && rM <= 1) {
@@ -151,6 +155,21 @@
           //   requestAnimationFrame(popFromCenter);
           // }
 
+          // function drawCenterPop(){
+          //   //angle /= 1.1;
+          //   adj += 0.1;
+          //   if (adj >= PI-0.2) {
+          //     doAnim = false;
+          //   }
+          //   const s = angle + adj;
+          //   const e = angle - adj;
+          //   ctx.beginPath();
+          //   ctx.arc(centerX,centerY,r,s,e);
+          //   ctx.fillStyle = createBubbleGradient(ctx, rgb1, centerX, centerY, r);
+          //   ctx.fill();
+          //   ctx.stroke();
+          // }
+
           function popFromEdge(){
             ctx.clearRect(0,0,w,h);
             if (!doAnim) {
@@ -171,10 +190,8 @@
             if (adj > PI - adjAmt) {
               doAnim = false;
             }
-
             // move previous droplets
             for (let i = 0; i < droplets.length; i++) {
-
               droplets[i].update();
             }
 
@@ -238,21 +255,6 @@
             ctx.fill();
             ctx.stroke();
           }
-
-          // function drawCenterPop(){
-          //   //angle /= 1.1;
-          //   adj += 0.1;
-          //   if (adj >= PI-0.2) {
-          //     doAnim = false;
-          //   }
-          //   const s = angle + adj;
-          //   const e = angle - adj;
-          //   ctx.beginPath();
-          //   ctx.arc(centerX,centerY,r,s,e);
-          //   ctx.fillStyle = createBubbleGradient(ctx, rgb1, centerX, centerY, r);
-          //   ctx.fill();
-          //   ctx.stroke();
-          // }
         }
       }
       //end for loop
