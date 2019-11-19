@@ -64,6 +64,7 @@
           let clicked = false;
           let adj = 0; // used for bubble opening
           const adjAmt = 0.1; // speed of bubble pop - best btw 0.03 and 0.5
+          const xyAdj = 6; // space between droplets (higher number: fewer droplets)
           const dAdjAmt = adjAmt * 100; // speed of droplets
           let radius = r;
           let rM; // slope between circle center and click point
@@ -97,20 +98,18 @@
             }
           }, false);
 
-          function createDroplet(color, x, y, statX, statY) {
+          function createDroplet(x, y, statX, statY) {
             let sz = rndm(0.5, 1.8, 1);
             let opc = rndm(0.4, 0.7, 1);
             let its = rndm(0, Math.min((droplets.length/4), 40));
             let vel = rndm(0.4, 3, 1);
-            let xOffset = 0, yOffset = 0; // row randomizer
+            // this block finds x or y pos based on y or x pos and slope +- 10px randomizer
             if (x === null) {
-              x = Math.round(((y - statY)/m) + statX);
-              xOffset = rndm(-10,10);
+              x = Math.round(((y - statY)/m) + statX) + rndm(-10,10);
             } else {
-              y = Math.round((m * (x-statX)) + statY);
-              yOffset = rndm(-10,10);
+              y = Math.round((m * (x-statX)) + statY) + rndm(-10,10);
             }
-            let drop = new Droplet(ctx, color, sz, x + xOffset, y + yOffset, opc, its, vel, ddx, ddy, dAdjAmt, yAxis, rM);
+            let drop = new Droplet(ctx, rgb1, sz, x, y, opc, its, vel, ddx, ddy, dAdjAmt, yAxis, rM);
             droplets.push(drop);
             drop.draw();
           }
@@ -176,7 +175,6 @@
             }
 
             // determine placement of initial droplet rows depending on opening direction
-            let xyAdj = 5; // space between droplets
             let x, y, statX, statY, xMax, yMax, origY, origX; 
             if (yAxis) {
               if (cirPt1Y > cirPt2Y) {
@@ -186,7 +184,7 @@
               }
               origY = y;
               while (y < yMax) {
-                createDroplet(rgb1, null, rndm(origY+1, yMax-1, 1), statX, statY);
+                createDroplet(null, rndm(origY+1, yMax-1, 1), statX, statY);
                 y += xyAdj;
               }
             } else {
@@ -197,7 +195,7 @@
               }
               origX = x;
               while (x < xMax) {
-                createDroplet(rgb1, rndm(origX+1,xMax-1,1), null, statX, statY);
+                createDroplet(rndm(origX+1,xMax-1,1), null, statX, statY);
                 x += xyAdj;
               }
             }
@@ -264,6 +262,7 @@
         }
       }
 
+      //resize debouncing optimization
       let timeout = false;
       window.addEventListener('resize', function() {
         clearTimeout(timeout);
