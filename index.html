@@ -41,6 +41,7 @@
         const padding = (4 * w) / 100; // 4vw space for explosion droplets
         for (let i=0; i<bubbles.length; i++) {
           const c = bubbles[i];
+          let droplets = [];
           let ctx = c.getContext("2d");
           const r = (bData[i].r * w) / 100; // r is percentage of page width
           c.width = (r * 2) + padding;
@@ -59,26 +60,55 @@
 
           let angle; //radians
           let doAnim = true;
-          let adj = 0;
-          const adjAmt = 0.01;
-          let radius = r;
           let clicked = false;
-          let m; // slope of circle opening
-          let yAxis = false; // default droples populate according to x axis
+          let adj = 0; 
+          const adjAmt = 0.01; //speed of animation
+          let radius = r;
+          let rM;
+          let m; // slope of circle opening (perpendicular to rM)
+          let yAxis = false; // default droplets populate along x axis
+          let ddx = 1, ddy = 1; // pos or neg droplet direction outward from bubble
+          let ccdx, ccdy; // px between click and center
 
-          function Droplet(color, size, xPos, yPos, opacity, key) {
+          function Droplet(color, size, xPos, yPos, opacity, its, vel) {
             this.color = color;
             this.size = size;
             this.xPos = xPos;
             this.yPos = yPos;
-            this.opacity = (Math.random() * 0.5) + 0.5;
-            this.key = key;
+            this.opacity = opacity;
+            this.its = its;
+            this.vel = vel;
+
             this.draw = function(){
               ctx.beginPath();
               ctx.arc(this.xPos, this.yPos, this.size, 0, PI * 2);
               ctx.fillStyle = `rbga(${this.color}, ${this.opacity})`;
+              ctx.strokeStyle = `rbga(${this.color}, ${this.opacity + 0.1})`;
               ctx.fill();
               ctx.stroke();
+            }
+
+            this.update = function() {
+
+              // figure out a modulo or fraction for when to increment x or y based on slope.
+
+              if (this.its > 0) {
+                if (yAxis) {
+                  let n = 1/(this.vel * 20);
+                  this.xPos += ddx * this.vel;
+                  this.yPos += n; // figure out
+                } else {
+                  let n = ddy + 1/(this.vel * 20);
+                  this.xPos += 0; // figure out
+                  this.yPos += n;
+                }
+                if (this.vel > 0.4){
+                  this.vel -= 0.04;
+                } else {
+                  this.its = 0;
+                }
+                this.draw();
+              }
             }
           }
 
@@ -96,14 +126,20 @@
                 requestAnimationFrame(popFromEdge);
               }
               angle = (Math.atan2(clickY - r - (padding/4), clickX - r - (padding/2))); 
-              let rM = ((clickY - centerY) / (clickX - centerX));
+              rM = ((clickY - centerY) / (clickX - centerX));
+              ccdx = Math.abs(clickX - centerX);
+              ccdy = Math.abs(clickY - centerY);
+              centerX > clickX ? ddx = -1 : null;
+              clickY < centerY ? ddy = -1 : null;
               if (rM >= -1 && rM <= 1) {
                 yAxis = true;
               }
               m = (-1/rM).toFixed(3);
+              rM = rM.toFixed(1);
+              // console.log("droplets x, y slope", dropletsXM, dropletsYM);
+              // console.log(rM, m)
               clicked = true;
             }
-
           }, false);
 
           // function popFromCenter(time){
@@ -139,56 +175,62 @@
               doAnim = false;
             }
 
+            // move previous droplets
+            for (let i = 0; i < droplets.length; i++) {
+
+              droplets[i].update();
+            }
+
+            // x and y of the two points on bubble circumference at bubble opening
             const cirPt1X = Math.round(centerX + (radius * Math.cos(s)));
             const cirPt1Y = Math.round(centerY - (radius * Math.sin(-s)));
             const cirPt2X = Math.round(centerX + (radius * Math.cos(e)));
             const cirPt2Y = Math.round(centerY - (radius * Math.sin(-e)));
-            let i = 0;
-            let xAdj = 3;
+            // let i = 0;
 
-            if (yAxis) {
-              let x, y, statY, statX, yMax;
-              if (cirPt1Y > cirPt2Y) {
-                y = cirPt2Y;
-                statX = cirPt1X;
-                statY = cirPt1Y;
-                yMax = cirPt1Y;
-              } else {
-                y = cirPt1Y;
-                statX = cirPt2X;
-                statY = cirPt2Y;
-                yMax = cirPt2Y;
-              }
-              while (y < yMax) {
+            function createDroplet(x, y, statX, statY) {
+              let sz = rndm(0.5, 1.8, 1);
+              let opc = rndm(0.4, 0.7, 1);
+              let its = rndm(0, Math.min((droplets.length/4), 40));
+              let vel = rndm(0.4, 1.5, 1);
+              if (x === null) {
                 x = Math.round(((y - statY)/m) + statX);
+              } else {
+                y = Math.round((m * (x-statX)) + statY);
+              }
+              let drop = new Droplet(rgb1, sz, x, y, opc, its, vel);
+              droplets.push(drop);
+              drop.draw();
+            }
 
-                let drop = new Droplet(rgb1, Math.random() + 1, x, y, (Math.random()*0.3) + 0.4, i);
-                drop.draw();
-                y += xAdj;
-                i++;
+            // determine placement of initial droplet rows depending on opening direction
+            let xyAdj = 20; // space between droplets
+            let x, y, statX, statY, xMax, yMax, origY, origX; 
+            if (yAxis) {
+              if (cirPt1Y > cirPt2Y) {
+                y = cirPt2Y, statX = cirPt1X, statY = cirPt1Y, yMax = cirPt1Y;
+              } else {
+                y = cirPt1Y, statX = cirPt2X, statY = cirPt2Y, yMax = cirPt2Y;
+              }
+              origY = y;
+              while (y < yMax) {
+                createDroplet(null, rndm(origY+1, yMax-1, 1), statX, statY);
+                y += xyAdj;
               }
             } else {
-              let x, y, statY, statX, xMax; 
               if (cirPt1X > cirPt2X) {
-                x = cirPt2X;
-                statX = cirPt2X;
-                statY = cirPt2Y;
-                xMax = cirPt1X;
+                x = cirPt2X, statX = cirPt2X, statY = cirPt2Y, xMax = cirPt1X;
               } else {
-                x = cirPt1X;
-                statX = cirPt1X;
-                statY = cirPt1Y;
-                xMax = cirPt2X;
+                x = cirPt1X, statX = cirPt1X, statY = cirPt1Y, xMax = cirPt2X;
               }
+              origX = x;
               while (x < xMax) {
-                let y = Math.round((m * (x-statX)) + statY);
-                let drop = new Droplet(rgb1, Math.random() + 1, x, y, (Math.random()*0.3) + 0.4, i);
-                drop.draw();
-                x += xAdj;
-                i++;
+                createDroplet(rndm(origX+1,xMax-1,1), null, statX, statY);
+                x += xyAdj;
               }
             }
 
+            // draw bubble
             ctx.beginPath();
             ctx.arc(centerX,centerY,r,s,e);
             ctx.fillStyle = createBubbleGradient(ctx, rgb1, centerX, centerY, r);
@@ -196,20 +238,20 @@
             ctx.stroke();
           }
 
-          function drawCenterPop(){
-            //angle /= 1.1;
-            adj += 0.1;
-            if (adj >= PI-0.2) {
-              doAnim = false;
-            }
-            const s = angle + adj;
-            const e = angle - adj;
-            ctx.beginPath();
-            ctx.arc(centerX,centerY,r,s,e);
-            ctx.fillStyle = createBubbleGradient(ctx, rgb1, centerX, centerY, r);
-            ctx.fill();
-            ctx.stroke();
-          }
+          // function drawCenterPop(){
+          //   //angle /= 1.1;
+          //   adj += 0.1;
+          //   if (adj >= PI-0.2) {
+          //     doAnim = false;
+          //   }
+          //   const s = angle + adj;
+          //   const e = angle - adj;
+          //   ctx.beginPath();
+          //   ctx.arc(centerX,centerY,r,s,e);
+          //   ctx.fillStyle = createBubbleGradient(ctx, rgb1, centerX, centerY, r);
+          //   ctx.fill();
+          //   ctx.stroke();
+          // }
         }
       }
       //end for loop
@@ -218,8 +260,8 @@
 
       let timeout = false;
       window.addEventListener('resize', function() {
-          clearTimeout(timeout);
-          timeout = setTimeout(redraw, 300);
+        clearTimeout(timeout);
+        timeout = setTimeout(redraw, 300);
       });
 
       function isInCircle(cx, cy, x, y, r) {
@@ -242,6 +284,13 @@
         gradient.addColorStop(0.95, `rgba(${rgb},0.2)`);
         gradient.addColorStop(1, `rgba(${rgb},0.4)`);
         return gradient;
+      }
+
+      function rndm(a,b,c){ 
+        a = a || 1;
+        b = b || 0;
+        c = c || 0;
+        return Number((Math.random()*(a-b)+b).toFixed(c)); 
       }
 
     </script>
